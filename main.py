@@ -4,39 +4,30 @@ import requests
 
 app = FastAPI()
 
-ENDERECO_LANCHONETE = "Rua Roberto Crispim dos Santos, 295, Jardim Marilu - Itapecerica da Serra - São Paulo"
-GOOGLE_MAPS_API_KEY = "AIzaSyDozfZEpygThvFnSZ-VFMat0E6BzGufK7M"
-VALOR_POR_KM = 2.0
-
-class FreteRequest(BaseModel):
+# Classe para validar o endereço do cliente
+class Endereco(BaseModel):
     endereco_cliente: str
 
-@app.post("/calcular_frete")
-def calcular_frete(data: FreteRequest):
-    endereco_cliente = data.endereco_cliente
+# Função para calcular a distância usando a Google Maps API
+def calcular_distancia(endereco_cliente):
+    google_maps_api_key = 'AIzaSyDozfZEpygThvFnSZ-VFMat0E6BzGufK7M'  # Substitua com sua chave de API do Google Maps
+    endereco_lanchonete = "Rua Roberto Crispim dos Santos, 295, Jardim Marilu - Itapecerica da Serra - São Paulo"  # Substitua com o endereço da sua lanchonete
 
-    url = (
-        f"https://maps.googleapis.com/maps/api/distancematrix/json"
-        f"?origins={ENDERECO_LANCHONETE}&destinations={endereco_cliente}"
-        f"&key={GOOGLE_MAPS_API_KEY}&language=pt-BR&units=metric"
-    )
+    # Monta a URL da API do Google Maps
+    url = f'https://maps.googleapis.com/maps/api/distancematrix/json?origins={endereco_lanchonete}&destinations={endereco_cliente}&key={google_maps_api_key}'
 
+    # Faz a requisição à API do Google
     response = requests.get(url)
     data = response.json()
 
-    try:
-        distancia_metros = data['rows'][0]['elements'][0]['distance']['value']
-        distancia_km = distancia_metros / 1000
-        frete = round(distancia_km * VALOR_POR_KM, 2)
+    if data["status"] == "OK":
+        distancia_km = data["rows"][0]["elements"][0]["distance"]["text"]
+        return distancia_km
+    else:
+        return "Erro ao calcular a distância."
 
-        return {
-            "distancia_km": round(distancia_km, 2),
-            "frete": frete,
-            "mensagem": f"A distância até o cliente é de {round(distancia_km, 2)} km. O valor do frete é R$ {frete:.2f}."
-        }
-
-    except Exception as e:
-        return {
-            "erro": "Erro ao calcular o frete.",
-            "detalhes": str(e)
-        }
+# Endpoint da API
+@app.post("/calcular_frete")
+async def calcular_frete(endereco: Endereco):
+    distancia = calcular_distancia(endereco.endereco_cliente)
+    return {"distancia": distancia}
